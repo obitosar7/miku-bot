@@ -41,19 +41,22 @@ let handler = async (m, { conn, args, text }) => {
 
     const { dlurl, title, thumbnail } = data.data;
 
+
+    const audioBuffer = (await axios.get(dlurl, { responseType: "arraybuffer" })).data;
+
     await conn.sendMessage(m.chat, {
-      audio: { url: dlurl },
+      audio: Buffer.from(audioBuffer),
       mimetype: 'audio/mpeg',
-      ptt: true,
+      ptt: false, 
+      fileName: `${title}.mp3`,
       contextInfo: {
         mentionedJid: [m.sender],
         externalAdReply: {
           title: `📄 العنوان: ${title}`,
           body: 'أنا لا أتحمل ذنب ما تشاهده أو تسمعه',
-          thumbnail: Buffer.from(await (await fetch(thumbnail.high)).arrayBuffer()),
+          thumbnailUrl: thumbnail.high, 
           mediaUrl: url,
           sourceUrl: url,
-          mediaType: 2,
           renderLargerThumbnail: true,
         }
       }
