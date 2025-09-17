@@ -1,4 +1,5 @@
 import axios from "axios";
+import yts from "yt-search";
 
 const fcontact = (m) => ({
   key: {
@@ -17,13 +18,20 @@ const fcontact = (m) => ({
 const apiBaseUrl = "https://api.obito-sar.store/api/download/youtube";
 
 let handler = async (m, { conn, args, text }) => {
-  if (!text) return m.reply("⚠️ من فضلك اكتب رابط الفيديو بعد الأمر.\n💡 مثال: اغنيه https://youtu.be/XXXXX");
+  if (!text) return m.reply("❗ من فضلك اكتب رابط الفيديو أو اسم الأغنية بعد الأمر.\n💡 مثال: \n.اغنيه عمرو دياب");
 
   try {
     await conn.sendMessage(m.chat, { react: { text: '🔎', key: m.key } });
 
-    const url = text.includes("youtube.com") || text.includes("youtu.be") ? text : null;
-    if (!url) return m.reply("❌ الرابط غير صالح.");
+    let url = null;
+
+    if (text.includes("youtube.com") || text.includes("youtu.be")) {
+      url = text;
+    } else {
+      const search = await yts(text);
+      if (!search.videos || !search.videos.length) return m.reply("❌ لم يتم العثور على نتائج.");
+      url = search.videos[0].url;
+    }
 
     await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
 
