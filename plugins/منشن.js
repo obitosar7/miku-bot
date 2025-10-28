@@ -57,7 +57,7 @@ let handler = async (m, { conn, text, participants, groupMetadata }) => {
     try {
         // إرسال الصورة مع النص في رسالة واحدة
         await conn.sendMessage(m.chat, {
-            image: { url: 'https://a.top4top.io/p_3586b4ixn1.jpg' },
+            image: { url: 'https://f.top4top.io/p_3588o2l9a1.jpg' },
             caption: messageText,
             mentions: users
         }, { quoted: fakegif });
