@@ -1,18 +1,28 @@
-let toM = a => '@' + a.split('@')[0]
-function handler(m, { groupMetadata }) {
-let ps = groupMetadata.participants.map(v => v.id)
-let a = ps.getRandom()
-let b
-do b = ps.getRandom()
-while (b === a)
-m.reply(`${toM(a)},  
-${toM(b)}, *تم اختياركم للزواج غظب 😼*`, null, {
-mentions: [a, b]
-})}
-handler.help = ['formarpareja']
-handler.tags = ['main', 'fun']
-handler.command = ['جواز','زواج']
+let handler = async (m, { groupMetadata, conn }) => {
+    let participants = groupMetadata.participants.map(v => v.id)
+    
+    let a = participants[Math.floor(Math.random() * participants.length)]
+    let b
+    do {
+        b = participants[Math.floor(Math.random() * participants.length)]
+    } while (b === a)
+    
+    let text = `🎉 *إعلان زواج* 🎉\n\n`
+    text += `👰 العروس: @${a.split('@')[0]}\n`
+    text += `🤵 العريس: @${b.split('@')[0]}\n\n`
+    text += `تم اختياركم للزواج غظب 😼💕\n`
+    text += `مبروك للعروسين! 🎊`
+    
+    await conn.sendMessage(m.chat, { 
+        text: text,
+        mentions: [a, b]
+    }, { quoted: m })
+}
+
+handler.help = ['زواج']
+handler.tags = ['fun', 'group']
+handler.command = ['زواج', 'جواز']
 handler.group = true
 handler.limit = 4
-handler.prem
+
 export default handler
