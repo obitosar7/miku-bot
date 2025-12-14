@@ -1,7 +1,7 @@
 import fetch from 'node-fetch'
 
 let handler = async (m, { conn }) => {
-  let audio = 'https://b.top4top.io/m_3620uuyrx1.mp3'
+  let audio = 'https://files.catbox.moe/hg70iz.mp3'
   let thumbnail = await (await fetch('https://c.top4top.io/p_3620gxh781.jpg')).buffer()
 
   await conn.sendMessage(m.chat, {
