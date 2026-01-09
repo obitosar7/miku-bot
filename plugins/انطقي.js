@@ -1,20 +1,33 @@
-import fetch from 'node-fetch';
+import axios from "axios";
 
-let handler = async (m, { conn, text }) => {
-    if (!text) return m.reply('*`『 اكتب الكلام اللي عايزني اقوله بلصوت مع الأمر 🍬 』`*');
+let handler = async (m, { args, conn }) => {
+  if (!args[0]) return m.reply("『 اكتب الكلام اللي عايزني اقوله بلصوت مع الأمر 🍬 』");
 
-    let res = await fetch(`https://the-end-api.vercel.app/home/sections/VoiceAi/api/api/voice/Laura?q=${encodeURIComponent(text)}&apikey=emam-a-key-500-unlimt-x8k3p9q2r5`);
-    let audioBuffer = await res.buffer();
+  const text = args.join(" ");
+  const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=ar&client=tw-ob`;
 
-    await conn.sendMessage(m.chat, {
-        audio: audioBuffer,
-        mimetype: 'audio/mpeg',
-        ptt: true
-    }, { quoted: m });
+  try {
+    const res = await axios.get(url, {
+      responseType: "arraybuffer",
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        Referer: "https://translate.google.com/",
+      },
+    });
+
+    await conn.sendMessage(
+      m.chat,
+      { audio: Buffer.from(res.data), mimetype: "audio/mpeg", ptt: true },
+      { quoted: m }
+    );
+  } catch (err) {
+    console.error("TTS Error:", err);
+    m.reply("❌ حدث خطأ أثناء تحويل النص لصوت.");
+  }
 };
 
-handler.command = ["انطقي"];
-handler.help = ["اسمع"];
-handler.tags = ['ai'];
+handler.help = ["tts"];
+handler.tags = ["tools"];
+handler.command = ["tts", "انطقي"];
 
 export default handler;
