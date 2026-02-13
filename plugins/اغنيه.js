@@ -5,144 +5,122 @@ const fcontact = (m) => ({
   key: {
     fromMe: false,
     participant: `0@s.whatsapp.net`,
-    remoteJid: 'status@broadcast'
+    remoteJid: "status@broadcast",
   },
   message: {
     contactMessage: {
       displayName: `${m.pushName || "User"}`,
-      vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${m.pushName || "User"};;;\nFN:${m.pushName || "User"}\nitem1.TEL;waid=${m.sender.split('@')[0]}:${m.sender.split('@')[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`
-    }
-  }
+      vcard: `BEGIN:VCARD\nVERSION:3.0\nN:;${m.pushName || "User"};;;\nFN:${m.pushName || "User"}\nitem1.TEL;waid=${
+        m.sender.split("@")[0]
+      }:${m.sender.split("@")[0]}\nitem1.X-ABLabel:Ponsel\nEND:VCARD`,
+    },
+  },
 });
 
-// استخدام مصادر متعددة للتحميل
-const APIS = {
-  izumi: {
-    byUrl: (url) => `https://izumiiiiiiii.dpdns.org/downloader/youtube?url=${encodeURIComponent(url)}&format=mp3`,
-    byQuery: (query) => `https://izumiiiiiiii.dpdns.org/downloader/youtube-play?query=${encodeURIComponent(query)}`
-  },
-  okatsu: {
-    byUrl: (url) => `https://okatsu-rolezapiiz.vercel.app/downloader/ytmp3?url=${encodeURIComponent(url)}`
-  }
-};
+// ✅ API الجديد
+const API_KEY = "xshadowzax"; // غيّره لو عندك مفتاح مختلف
+const CAVIROX_API = (q) =>
+  `https://apix.cavirox.com/api/download/yt?q=${encodeURIComponent(q)}&apikey=${encodeURIComponent(
+    API_KEY
+  )}`;
 
-async function tryRequest(getter, attempts = 3) {
-  let lastError;
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      return await getter();
-    } catch (err) {
-      lastError = err;
-      if (attempt < attempts) {
-        await new Promise(r => setTimeout(r, 1000 * attempt));
-      }
-    }
-  }
-  throw lastError;
-}
+async function getDownloadFromCavirox(queryOrUrl) {
+  const res = await axios.get(CAVIROX_API(queryOrUrl), {
+    timeout: 30_000,
+    validateStatus: () => true,
+  });
 
-async function getDownloadLink(youtubeUrl, query = null) {
-  // المحاولة الأولى: Izumi بالرابط
-  try {
-    const res = await tryRequest(() => axios.get(APIS.izumi.byUrl(youtubeUrl)));
-    if (res?.data?.result?.download) {
-      return {
-        dlurl: res.data.result.download,
-        title: res.data.result.title,
-        thumbnail: { high: res.data.result.thumbnail }
-      };
-    }
-  } catch (e1) {
-    // المحاولة الثانية: Izumi بالبحث
-    if (query) {
-      try {
-        const res = await tryRequest(() => axios.get(APIS.izumi.byQuery(query)));
-        if (res?.data?.result?.download) {
-          return {
-            dlurl: res.data.result.download,
-            title: res.data.result.title,
-            thumbnail: { high: res.data.result.thumbnail }
-          };
-        }
-      } catch (e2) {
-        // المحاولة الثالثة: Okatsu
-        try {
-          const res = await tryRequest(() => axios.get(APIS.okatsu.byUrl(youtubeUrl)));
-          if (res?.data?.dl) {
-            return {
-              dlurl: res.data.dl,
-              title: res.data.title,
-              thumbnail: { high: res.data.thumb }
-            };
-          }
-        } catch (e3) {
-          throw new Error('جميع محاولات التحميل فشلت');
-        }
-      }
-    }
+  // شكل الرد حسب المثال:
+  // { status: true, title, duration, url, thumbnail, downloads: { mp3, mp4 } }
+  const data = res?.data;
+
+  if (!data || data.status !== true) {
+    // حاول استخراج رسالة لو موجودة، وإلا رسالة عامة
+    throw new Error(data?.message || "فشل API في جلب بيانات التحميل");
   }
+
+  const mp3 = data?.downloads?.mp3;
+  if (!mp3) throw new Error("لم يتم العثور على رابط mp3 داخل API");
+
+  return {
+    dlurl: mp3,
+    title: data.title || "audio",
+    thumbnail: { high: data.thumbnail },
+    url: data.url, // رابط اليوتيوب (مفيد للكرت)
+    duration: data.duration,
+    views: data.views,
+  };
 }
 
 let handler = async (m, { conn, args, text }) => {
-  if (!text) return m.reply("❗ من فضلك اكتب رابط الفيديو أو اسم الأغنية بعد الأمر.\n💡 مثال: \n.اغنيه عمرو دياب");
+  if (!text)
+    return m.reply(
+      "❗ من فضلك اكتب رابط الفيديو أو اسم الأغنية بعد الأمر.\n💡 مثال:\n.اغنيه عمرو دياب"
+    );
 
   try {
-    await conn.sendMessage(m.chat, { react: { text: '🔎', key: m.key } });
+    await conn.sendMessage(m.chat, { react: { text: "🔎", key: m.key } });
 
-    let url = null;
+    // نجلب معلومات فيديو للعرض (اختياري) من yt-search
     let videoInfo = {};
+    let ytUrl = null;
 
     if (text.includes("youtube.com") || text.includes("youtu.be")) {
-      url = text;
-      // الحصول على معلومات الفيديو من الرابط
-      const search = await yts({ videoId: getVideoId(url) });
+      ytUrl = text;
+      const vid = await yts({ videoId: getVideoId(text) });
       videoInfo = {
-        title: search.title,
-        thumbnail: search.thumbnail,
-        timestamp: search.timestamp
+        title: vid?.title,
+        thumbnail: vid?.thumbnail,
+        timestamp: vid?.timestamp,
       };
     } else {
       const search = await yts(text);
-      if (!search.videos || !search.videos.length) return m.reply("❌ لم يتم العثور على نتائج.");
+      if (!search.videos || !search.videos.length)
+        return m.reply("❌ لم يتم العثور على نتائج.");
       const video = search.videos[0];
-      url = video.url;
+      ytUrl = video.url;
       videoInfo = {
         title: video.title,
         thumbnail: video.thumbnail,
-        timestamp: video.timestamp
+        timestamp: video.timestamp,
       };
     }
 
-    await conn.sendMessage(m.chat, { react: { text: '⏳', key: m.key } });
+    await conn.sendMessage(m.chat, { react: { text: "⏳", key: m.key } });
 
-    const downloadData = await getDownloadLink(url, videoInfo.title || text);
+    // ✅ نستخدم API الجديد: الأفضل نرسل له "العنوان" أو "النص" لأنه يقبل q
+    const q = videoInfo.title || text;
+    const downloadData = await getDownloadFromCavirox(q);
 
-    if (!downloadData) return m.reply('⚠️ فشل الحصول على رابط التحميل.');
+    const { dlurl, title, thumbnail, url } = downloadData;
 
-    const { dlurl, title, thumbnail } = downloadData;
+    const audioBuffer = (
+      await axios.get(dlurl, { responseType: "arraybuffer", timeout: 60_000 })
+    ).data;
 
-    const audioBuffer = (await axios.get(dlurl, { responseType: "arraybuffer" })).data;
+    await conn.sendMessage(
+      m.chat,
+      {
+        audio: Buffer.from(audioBuffer),
+        mimetype: "audio/mpeg",
+        ptt: false,
+        fileName: `${title}.mp3`,
+        contextInfo: {
+          mentionedJid: [m.sender],
+          externalAdReply: {
+            title: `📄 العنوان: ${title}`,
+            body: "أنا لا أتحمل ذنب ما تشاهده أو تسمعه",
+            thumbnailUrl: thumbnail?.high || videoInfo.thumbnail,
+            mediaUrl: url || ytUrl,
+            sourceUrl: url || ytUrl,
+            renderLargerThumbnail: true,
+          },
+        },
+      },
+      { quoted: fcontact(m) }
+    );
 
-    await conn.sendMessage(m.chat, {
-      audio: Buffer.from(audioBuffer),
-      mimetype: 'audio/mpeg',
-      ptt: false, 
-      fileName: `${title}.mp3`,
-      contextInfo: {
-        mentionedJid: [m.sender],
-        externalAdReply: {
-          title: `📄 العنوان: ${title}`,
-          body: 'أنا لا أتحمل ذنب ما تشاهده أو تسمعه',
-          thumbnailUrl: thumbnail.high, 
-          mediaUrl: url,
-          sourceUrl: url,
-          renderLargerThumbnail: true,
-        }
-      }
-    }, { quoted: fcontact(m) });
-
-    await conn.sendMessage(m.chat, { react: { text: '✅', key: m.key } });
-
+    await conn.sendMessage(m.chat, { react: { text: "✅", key: m.key } });
   } catch (err) {
     console.error(err);
     m.reply(`⚠️ خطأ أثناء التحميل: ${err.message}`);
@@ -151,7 +129,9 @@ let handler = async (m, { conn, args, text }) => {
 
 // دالة مساعدة لاستخراج ID من رابط يوتيوب
 function getVideoId(url) {
-  const match = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+  const match = url.match(
+    /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+  );
   return match ? match[1] : null;
 }
 
